@@ -251,9 +251,58 @@
     .cards { grid-template-columns: repeat(2, 1fr); }
     .card-value { font-size: 22px; }
   }
+
+  /* ── Password Gate ── */
+  .pw-gate {
+    position: fixed; inset: 0; z-index: 200;
+    background: #f7f8fa;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .pw-card {
+    background: #fff; border: 1px solid #e5e8ec; border-radius: 16px;
+    padding: 40px 36px; width: 100%; max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.1); text-align: center;
+  }
+  .pw-lock { font-size: 48px; margin-bottom: 12px; }
+  .pw-card h2 { margin: 0 0 8px; font-size: 22px; }
+  .pw-card p { color: #5a6370; font-size: 14px; margin: 0 0 24px; line-height: 1.5; }
+  .pw-input {
+    width: 100%; padding: 14px; border: 2px solid #d4d8de; border-radius: 8px;
+    font-size: 16px; text-align: center; letter-spacing: 2px;
+    margin-bottom: 12px; min-height: 52px; transition: border-color .15s;
+  }
+  .pw-input:focus { outline: none; border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,.15); }
+  .pw-input.shake { animation: shake .35s; border-color: #d93a3a; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 60%{transform:translateX(10px)} 80%{transform:translateX(-5px)} }
+  .pw-btn {
+    width: 100%; padding: 14px; background: #4a6cf7; color: #fff;
+    border: none; border-radius: 8px; font-size: 16px; font-weight: 700;
+    cursor: pointer; min-height: 52px; touch-action: manipulation;
+    transition: background .15s;
+  }
+  .pw-btn:hover { background: #3a5ae0; }
+  .pw-btn:disabled { background: #8a929e; cursor: not-allowed; }
+  .pw-error { color: #d93a3a; font-size: 13px; margin-top: 12px; min-height: 20px; }
+  .pw-footer { margin-top: 20px; font-size: 11px; color: #8a929e; }
 </style>
 </head>
 <body>
+
+<!-- ── Password Gate (shown when data.json is encrypted) ── -->
+<div class="pw-gate" id="pw-gate" style="display:none;">
+  <div class="pw-card">
+    <div class="pw-lock">&#128272;</div>
+    <h2>Active JO Tracker</h2>
+    <p>This report is password protected.<br>Enter the team password to continue.</p>
+    <input type="password" class="pw-input" id="pw-input" placeholder="Enter team password"
+           autocomplete="current-password" enterkeyhint="go" />
+    <button class="pw-btn" id="pw-btn">Unlock &#8594;</button>
+    <div class="pw-error" id="pw-error"></div>
+    <div class="pw-footer">&#128274; Data is encrypted &mdash; protected even if someone finds the source</div>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <div>
@@ -458,6 +507,11 @@
     <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" />
     <div class="settings-note">Generated once at: github.com → Settings → Developer settings → Personal access tokens → Tokens (classic). Check the <strong>public_repo</strong> scope. Your token is stored only in this browser and never shared.</div>
 
+    <hr class="divider" />
+    <label>&#128272; Team Password <span style="font-weight:400; text-transform:none; font-size:11px; color:#8a929e;">(for data encryption — optional but recommended)</span></label>
+    <input type="password" id="team-password" placeholder="e.g. HostinTeam2026!" autocomplete="off" />
+    <div class="settings-note">When set, your JO data is <strong>encrypted</strong> before being pushed to GitHub. Share this password once with your team — they'll enter it when opening the tracker. Leave blank to disable encryption.</div>
+
     <div class="modal-error" id="settings-error"></div>
     <div class="modal-success" id="settings-success"></div>
     <div class="modal-actions">
@@ -468,6 +522,36 @@
 </div>
 
 <script>
+// ─── AES-256-GCM Encryption helpers (Web Crypto API — no external libs) ──
+function b64ToBytes(b64) { return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+function bytesToB64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf instanceof ArrayBuffer ? buf : buf.buffer))); }
+
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const raw = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salt instanceof Uint8Array ? salt : b64ToBytes(salt), iterations: 120000, hash: 'SHA-256' },
+    raw, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptPayload(plainObj, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(password, salt);
+  const enc  = new TextEncoder();
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(plainObj)));
+  return { encrypted: true, salt: bytesToB64(salt), iv: bytesToB64(iv), ciphertext: bytesToB64(cipher), reportDate: plainObj.reportDate || '' };
+}
+
+async function decryptPayload(encObj, password) {
+  const key   = await deriveKey(password, encObj.salt);
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b64ToBytes(encObj.iv) }, key, b64ToBytes(encObj.ciphertext)
+  );
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
 // ─── Initial embedded data (fallback when data.json is not available) ───
 let DATA = [
   { id:13539, owner:"Michael Wrightington", priority:"A", title:"IS Business Operations Manager (interim)", client:"Medical University of South Carolina", recruiters:[], intSub:0, cliSub:0, intv:0, candidates:[] },
@@ -495,35 +579,112 @@ let DATA = [
 let reportDate = "Apr 23, 2026";
 let state = { sortKey: 'priority', sortDir: 'asc', expanded: new Set() };
 let ghSettings = null;
-let dataLoaded = false; // true once data.json fetched successfully
+let teamPassword = null;   // team password for encrypt/decrypt
+let encryptedJson = null;  // raw encrypted blob (for password-gate retry)
 
-// ─── GitHub Settings ───────────────────────────────────────────────────
+// ─── Settings ──────────────────────────────────────────────────────────
 function loadSettings() {
   try {
     const s = localStorage.getItem('jo_gh_settings');
     if (s) ghSettings = JSON.parse(s);
+    // Team password lives in sessionStorage (cleared when browser closes)
+    const p = sessionStorage.getItem('jo_team_pw');
+    if (p) teamPassword = p;
   } catch (e) {}
 }
 
-function saveGhSettings(owner, repo, token) {
+function saveSettings(owner, repo, token, pw) {
   ghSettings = { owner: owner.trim(), repo: repo.trim(), token: token.trim() };
   try { localStorage.setItem('jo_gh_settings', JSON.stringify(ghSettings)); } catch (e) {}
+  if (pw && pw.trim()) {
+    teamPassword = pw.trim();
+    try { sessionStorage.setItem('jo_team_pw', teamPassword); } catch (e) {}
+  }
 }
 
 function getSettingsConfigured() {
   return ghSettings && ghSettings.owner && ghSettings.repo && ghSettings.token;
 }
 
-// ─── Data loading: fetch data.json from same domain ────────────────────
+// ─── Password Gate ─────────────────────────────────────────────────────
+function showPasswordGate() {
+  document.getElementById('pw-gate').style.display = 'flex';
+  setTimeout(() => document.getElementById('pw-input').focus(), 150);
+}
+
+function hidePasswordGate() {
+  const gate = document.getElementById('pw-gate');
+  gate.style.transition = 'opacity .3s';
+  gate.style.opacity = '0';
+  setTimeout(() => { gate.style.display = 'none'; gate.style.opacity = ''; }, 320);
+}
+
+async function tryUnlock(password) {
+  if (!encryptedJson) return;
+  const btn   = document.getElementById('pw-btn');
+  const errEl = document.getElementById('pw-error');
+  const input = document.getElementById('pw-input');
+  btn.disabled = true; btn.textContent = 'Unlocking…'; errEl.textContent = '';
+  try {
+    const payload = await decryptPayload(encryptedJson, password);
+    if (!Array.isArray(payload.data) || payload.data.length === 0) throw new Error('empty');
+    DATA = payload.data;
+    reportDate = payload.reportDate || reportDate;
+    teamPassword = password;
+    try { sessionStorage.setItem('jo_team_pw', password); } catch (e) {}
+    document.getElementById('report-date').textContent = reportDate;
+    document.getElementById('footer-date').textContent = reportDate;
+    rebuildFilters(); render();
+    hidePasswordGate();
+  } catch (e) {
+    input.classList.add('shake');
+    errEl.textContent = '❌ Wrong password — ask Olga for the team password.';
+    setTimeout(() => input.classList.remove('shake'), 400);
+    input.value = ''; input.focus();
+    btn.disabled = false; btn.textContent = 'Unlock →';
+  }
+}
+
+// ─── Data loading: fetch data.json, handle plain or encrypted ──────────
 async function loadData() {
   try {
     const res = await fetch('./data.json?v=' + Date.now());
     if (res.ok) {
       const json = await res.json();
+
+      if (json.encrypted) {
+        // ── Encrypted path ──────────────────────────────────────────────
+        encryptedJson = json;
+        reportDate = json.reportDate || reportDate;
+        document.getElementById('report-date').textContent = reportDate;
+        document.getElementById('footer-date').textContent = reportDate;
+        rebuildFilters(); render(); // show empty tracker behind the gate
+        // Try cached session password first (avoid gate if already unlocked)
+        if (teamPassword) {
+          try {
+            const payload = await decryptPayload(json, teamPassword);
+            if (Array.isArray(payload.data) && payload.data.length > 0) {
+              DATA = payload.data;
+              reportDate = payload.reportDate || reportDate;
+              document.getElementById('report-date').textContent = reportDate;
+              document.getElementById('footer-date').textContent = reportDate;
+              rebuildFilters(); render();
+              return; // unlocked silently — no gate needed
+            }
+          } catch (e) {
+            // Cached password wrong — fall through to show gate
+            teamPassword = null;
+            try { sessionStorage.removeItem('jo_team_pw'); } catch (e2) {}
+          }
+        }
+        showPasswordGate();
+        return;
+      }
+
+      // ── Plain (unencrypted) path ────────────────────────────────────
       if (Array.isArray(json.data) && json.data.length > 0) {
         DATA = json.data;
         reportDate = json.reportDate || new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
-        dataLoaded = true;
       }
     }
   } catch (e) {
@@ -565,12 +726,15 @@ async function publishToGitHub() {
       throw new Error(`GitHub API error ${getRes.status}: ${err.message || 'check your token and repository name'}`);
     }
 
-    // Build the data package
-    const payload = {
-      data: DATA,
-      reportDate: reportDate,
-      publishedAt: new Date().toISOString()
-    };
+    // Build the data package (encrypt if team password is set)
+    const rawPayload = { data: DATA, reportDate, publishedAt: new Date().toISOString() };
+    let payload;
+    if (teamPassword) {
+      showPublishStatus('loading', '🔐 Encrypting data…');
+      payload = await encryptPayload(rawPayload, teamPassword);
+    } else {
+      payload = rawPayload;
+    }
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
 
     const body = {
@@ -595,7 +759,8 @@ async function publishToGitHub() {
       throw new Error(err.message || `HTTP ${putRes.status}`);
     }
 
-    showPublishStatus('success', '✅ Published! Your team will see the updated data in about 60 seconds.');
+    const pwNote = teamPassword ? ' (encrypted 🔐)' : ' (not encrypted — add a team password in Settings for security)';
+    showPublishStatus('success', `✅ Published${pwNote}! Team sees it in ~60 seconds.`);
   } catch (err) {
     showPublishStatus('error', '❌ ' + err.message);
   } finally {
@@ -816,14 +981,26 @@ document.getElementById('btn-print').addEventListener('click', () => window.prin
 // Publish
 document.getElementById('btn-publish').addEventListener('click', publishToGitHub);
 
+// ── Password gate events ────────────────────────────────────────────────
+document.getElementById('pw-btn').addEventListener('click', () => {
+  const pw = document.getElementById('pw-input').value;
+  if (pw) tryUnlock(pw);
+});
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const pw = document.getElementById('pw-input').value;
+    if (pw) tryUnlock(pw);
+  }
+});
+
 // Settings modal
 document.getElementById('btn-settings').addEventListener('click', () => {
-  // Pre-fill if already configured
   if (ghSettings) {
     document.getElementById('gh-owner').value = ghSettings.owner || '';
     document.getElementById('gh-repo').value = ghSettings.repo || '';
     document.getElementById('gh-token').value = ghSettings.token || '';
   }
+  if (teamPassword) document.getElementById('team-password').value = teamPassword;
   document.getElementById('settings-error').classList.remove('show');
   document.getElementById('settings-success').classList.remove('show');
   openModal('modal-settings');
@@ -831,23 +1008,25 @@ document.getElementById('btn-settings').addEventListener('click', () => {
 document.getElementById('btn-settings-cancel').addEventListener('click', () => closeModal('modal-settings'));
 document.getElementById('btn-settings-save').addEventListener('click', () => {
   const owner = document.getElementById('gh-owner').value.trim();
-  const repo = document.getElementById('gh-repo').value.trim();
+  const repo  = document.getElementById('gh-repo').value.trim();
   const token = document.getElementById('gh-token').value.trim();
+  const pw    = document.getElementById('team-password').value;
   const errEl = document.getElementById('settings-error');
-  const okEl = document.getElementById('settings-success');
+  const okEl  = document.getElementById('settings-success');
   errEl.classList.remove('show'); okEl.classList.remove('show');
   if (!owner || !repo || !token) {
-    errEl.textContent = 'Please fill in all three fields.';
+    errEl.textContent = 'Please fill in GitHub Username, Repo Name, and Token.';
     errEl.classList.add('show'); return;
   }
   if (!token.startsWith('gh')) {
     errEl.textContent = 'That doesn\'t look like a GitHub token (should start with "ghp_" or "github_pat_").';
     errEl.classList.add('show'); return;
   }
-  saveGhSettings(owner, repo, token);
-  okEl.textContent = '✅ Settings saved! You can now use the Publish Update button.';
+  saveSettings(owner, repo, token, pw);
+  const pwMsg = pw ? ' Team password saved — data will be encrypted on next publish.' : '';
+  okEl.textContent = '✅ Settings saved!' + pwMsg;
   okEl.classList.add('show');
-  setTimeout(() => closeModal('modal-settings'), 2000);
+  setTimeout(() => closeModal('modal-settings'), 2500);
 });
 
 // Import
@@ -994,7 +1173,7 @@ function parseEmailStyle(text) {
 
 // ─── Boot ──────────────────────────────────────────────────────────────
 loadSettings();
-loadData();
+loadData(); // fetches data.json; shows password gate if encrypted
 </script>
 </body>
 </html>
