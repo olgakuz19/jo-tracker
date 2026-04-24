@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Active JO Tracker</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f7f8fa; color: #1a1d21; font-size: 14px; line-height: 1.5;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { margin: 0 0 4px 0; font-size: 24px; font-weight: 700; }
+  .subtitle { color: #5a6370; font-size: 14px; }
+  .header-right { display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+  .button-row { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .sync-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: #e7f5ee; color: #0f6b3b;
+    font-size: 12px; font-weight: 600; border: 1px solid #bfe3cd;
+  }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #2eaa5e; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(46,170,94,.6);} 70%{box-shadow:0 0 0 8px rgba(46,170,94,0);} 100%{box-shadow:0 0 0 0 rgba(46,170,94,0);} }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border-radius: 8px;
+    background: #4a6cf7; color: #fff; font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer; white-space: nowrap; min-height: 44px;
+    touch-action: manipulation;
+  }
+  .btn:hover { background: #3a5ae0; }
+  .btn-secondary { background:#fff; color:#1a1d21; border:1px solid #d4d8de; }
+  .btn-secondary:hover { background:#f1f3f5; }
+  .btn-ghost { background: transparent; color: #4a6cf7; border: none; }
+  .btn-ghost:hover { background: #eef2ff; }
+  .btn-publish { background: #0f6b3b; color: #fff; }
+  .btn-publish:hover { background: #0d5c33; }
+  .btn-publish:disabled { background: #8a929e; cursor: not-allowed; }
+  .btn-settings { background: #fff; color: #5a6370; border: 1px solid #d4d8de; }
+  .btn-settings:hover { background: #f1f3f5; }
+  .web-banner {
+    background: #eef5ff; border: 1px solid #c5d7ff; color: #1e3a8a;
+    padding: 10px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .readonly-banner {
+    background: #fff8e1; border: 1px solid #ffe49b; color: #6b4e00;
+    padding: 10px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .publish-status {
+    display: none; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    margin-top: 8px;
+  }
+  .publish-status.show { display: flex; }
+  .publish-status.success { background: #e7f5ee; color: #0f6b3b; border: 1px solid #bfe3cd; }
+  .publish-status.error { background: #fde7e7; color: #a42020; border: 1px solid #f5c6c6; }
+  .publish-status.loading { background: #eef5ff; color: #1e3a8a; border: 1px solid #c5d7ff; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid #e5e8ec; border-radius: 10px; padding: 14px 16px; }
+  .card-label { font-size: 11px; color: #5a6370; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: 4px; }
+  .card-value { font-size: 26px; font-weight: 700; }
+  .card.priority-a { border-left: 4px solid #d93a3a; }
+  .card.priority-b { border-left: 4px solid #e89315; }
+  .card.priority-c { border-left: 4px solid #2e8b46; }
+  .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+  .filters {
+    background: #fff; border: 1px solid #e5e8ec; border-radius: 10px;
+    padding: 14px; margin-bottom: 16px;
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px;
+  }
+  .filter-group label { display: block; font-size: 11px; color: #5a6370; font-weight: 600; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+  .filter-group input, .filter-group select {
+    width: 100%; padding: 9px 10px; border: 1px solid #d4d8de; border-radius: 6px;
+    font-size: 14px; background: #fff; color: #1a1d21; min-height: 44px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .filter-group select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6370' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+  .filter-group input:focus, .filter-group select:focus { outline: none; border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,.15); }
+  .table-container { position: relative; }
+  .scroll-hint { display: none; text-align: center; font-size: 11px; color: #8a929e; padding: 4px 0 8px; }
+  .table-wrap { background: #fff; border: 1px solid #e5e8ec; border-radius: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  th { text-align: left; padding: 12px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #5a6370; font-weight: 700; background: #fafbfc; border-bottom: 1px solid #e5e8ec; cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { background: #f1f3f5; }
+  th .sort-arrow { opacity: .3; margin-left: 4px; font-size: 10px; }
+  th.sort-asc .sort-arrow, th.sort-desc .sort-arrow { opacity: 1; color: #4a6cf7; }
+  td { padding: 14px 12px; border-bottom: 1px solid #eef0f2; font-size: 14px; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr.data-row { cursor: pointer; }
+  tr.data-row:hover td { background: #fafbfc; }
+  tr.expanded td { background: #f6f8ff; }
+  .candidate-row td { background: #fbfcff; border-top: none; }
+  .candidate-row .label { font-size: 11px; color: #5a6370; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; margin-bottom: 8px; }
+  .candidate-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-block; padding: 5px 12px; border-radius: 16px;
+    background: #e7eefd; color: #2a4fc9; font-size: 13px; font-weight: 500;
+  }
+  .chip.empty { background: #f1f3f5; color: #8a929e; font-style: italic; }
+  .priority-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    font-size: 13px; font-weight: 700; color: #fff;
+  }
+  .priority-A { background: #d93a3a; }
+  .priority-B { background: #e89315; }
+  .priority-C { background: #2e8b46; }
+  .job-id { color: #5a6370; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#f1f3f5; padding:3px 7px; border-radius:4px; display:inline-block; font-weight:600; }
+  .job-title { font-weight: 600; color: #1a1d21; margin-top:4px; font-size: 14px; }
+  .client { color: #5a6370; font-size: 12px; margin-top: 2px; }
+  .avatar {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: #4a6cf7; color: #fff; font-size: 10px; font-weight: 600;
+    border: 2px solid #fff; margin-left: -6px;
+  }
+  .avatar:first-child { margin-left: 0; }
+  .avatar.sales { background: #6f42c1; }
+  .pipeline { display: flex; gap: 6px; }
+  .pipe-stat {
+    display: inline-flex; flex-direction: column; align-items: center;
+    min-width: 44px; padding: 5px 7px; border-radius: 6px; font-size: 11px;
+    cursor: help; position: relative;
+  }
+  .pipe-stat .num { font-weight: 700; color: #1a1d21; font-size: 15px; }
+  .pipe-stat .lbl { font-size: 9px; color: #5a6370; text-transform: uppercase; font-weight: 600; }
+  .pipe-stat.intsub { background: #e7eefd; }
+  .pipe-stat.clisub { background: #fff3d6; }
+  .pipe-stat.intv { background: #d4f4dd; }
+  .pipe-stat:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: #1a1d21; color: #fff; padding: 6px 10px; border-radius: 6px;
+    font-size: 12px; white-space: nowrap; font-weight: 500; letter-spacing: 0; text-transform: none;
+    z-index: 10;
+  }
+  .pipe-stat:hover::before {
+    content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1a1d21; z-index: 10;
+  }
+  .caret { display:inline-block; width:14px; color:#8a929e; transition: transform .15s; font-size:13px; }
+  tr.expanded .caret { transform: rotate(90deg); color:#4a6cf7; }
+  .side-panel { display:flex; flex-direction:column; gap:16px; }
+  .panel { background: #fff; border: 1px solid #e5e8ec; border-radius: 10px; padding: 16px; }
+  .panel h3 { margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #5a6370; font-weight: 700; }
+  .panel-list { list-style: none; margin: 0; padding: 0; }
+  .panel-list li { padding: 10px 0; border-bottom: 1px solid #eef0f2; font-size: 13px; display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .panel-list li:last-child { border-bottom: none; }
+  .panel-list .job-mini { flex:1; min-width:0; }
+  .panel-list .jid { color:#5a6370; font-size:10px; font-family: ui-monospace, monospace; font-weight: 600; }
+  .panel-list .jt { font-weight:600; font-size:13px; margin-top: 2px; }
+  .panel-list .jc { color:#5a6370; font-size:12px; margin-top: 1px; }
+  .panel-list .metric { background:#4a6cf7; color:#fff; border-radius:14px; padding:3px 10px; font-size:12px; font-weight:700; white-space: nowrap; }
+  .panel-list .metric.gold { background:#e89315; }
+  footer { margin-top: 16px; text-align: center; color: #8a929e; font-size: 12px; }
+
+  /* Modals */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:100; padding:20px; overflow-y: auto; }
+  .modal-bg.show { display:flex; }
+  .modal { background:#fff; border-radius:12px; padding:28px; width:100%; max-width:580px; max-height:90vh; overflow-y:auto; box-shadow: 0 20px 50px rgba(0,0,0,.25); margin: auto; }
+  .modal h2 { margin:0 0 10px 0; font-size:22px; color:#1a1d21; }
+  .modal p { color:#3a4150; margin:0 0 14px 0; font-size:15px; line-height:1.55; }
+  .modal label { display:block; font-size:11px; color:#5a6370; font-weight:600; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em; margin-top:14px; }
+  .modal textarea { width:100%; height:200px; padding:10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; border:1px solid #d4d8de; border-radius:6px; resize:vertical; }
+  .modal input[type=file] { font-size:13px; padding: 8px 0; }
+  .modal input[type=text], .modal input[type=password] {
+    width: 100%; padding: 10px 12px; border: 1px solid #d4d8de; border-radius: 6px;
+    font-size: 14px; min-height: 44px;
+  }
+  .modal input[type=text]:focus, .modal input[type=password]:focus { outline: none; border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,.15); }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; flex-wrap: wrap; }
+  .modal-error { background:#fde7e7; color:#a42020; padding:10px 14px; border-radius:8px; font-size:13px; margin-top:12px; display:none; }
+  .modal-error.show { display:block; }
+  .modal-success { background:#e7f5ee; color:#0f6b3b; padding:10px 14px; border-radius:8px; font-size:13px; margin-top:12px; display:none; }
+  .modal-success.show { display:block; }
+  .tips { list-style: none; padding: 0; margin: 0; }
+  .tips li { padding: 12px 0; border-bottom: 1px solid #eef0f2; display: flex; gap: 14px; align-items: flex-start; }
+  .tips li:last-child { border-bottom: none; }
+  .tip-icon { width: 34px; height: 34px; border-radius: 50%; background: #eef2ff; color: #4a6cf7; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; font-weight: 700; }
+  .tip-body { flex: 1; }
+  .tip-body strong { color: #1a1d21; font-size: 14px; display: block; margin-bottom: 2px; }
+  .tip-body span { color: #5a6370; font-size: 13px; }
+  .url-box { background: #f7f8fa; border: 1px solid #d4d8de; border-radius: 8px; padding: 12px 14px; font-family: ui-monospace, monospace; font-size: 13px; color: #1a1d21; word-break: break-all; margin: 8px 0 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .url-box span { flex: 1; }
+  .copy-btn { background: #eef2ff; color: #4a6cf7; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .copy-btn:hover { background: #dde6ff; }
+  .settings-note { font-size: 12px; color: #5a6370; margin-top: 4px; line-height: 1.4; }
+  .token-steps { background: #f7f8fa; border-radius: 8px; padding: 12px 14px; margin-top: 8px; font-size: 12px; color: #3a4150; line-height: 1.6; }
+  .token-steps ol { margin: 0; padding-left: 18px; }
+  .divider { border: none; border-top: 1px solid #eef0f2; margin: 16px 0; }
+  .step-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #4a6cf7; color: #fff; font-size: 11px; font-weight: 700; margin-right: 6px; }
+  .gh-config-preview { background: #f7f8fa; border: 1px solid #d4d8de; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #5a6370; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+  /* Floating help button */
+  .help-fab {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #4a6cf7; color: #fff; border: none;
+    font-size: 24px; cursor: pointer; box-shadow: 0 4px 16px rgba(74,108,247,.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50; touch-action: manipulation;
+  }
+  .help-fab:hover { background: #3a5ae0; transform: scale(1.05); transition: transform .15s; }
+
+  /* Print styles */
+  @media print {
+    body { background: #fff; }
+    .help-fab, .filters, .button-row, .sync-badge, .web-banner, .readonly-banner, .publish-status { display: none !important; }
+    .side-panel { grid-column: 1 / -1; }
+    .main-grid { grid-template-columns: 1fr; }
+    .wrap { padding: 10px; }
+    tr.data-row.expanded + .candidate-row { display: table-row !important; }
+    thead { display: table-header-group; }
+  }
+
+  /* Tablet */
+  @media (max-width: 1100px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .filters { grid-template-columns: 1fr 1fr; }
+    .help-fab { bottom: 16px; right: 16px; }
+  }
+
+  /* Mobile */
+  @media (max-width: 640px) {
+    header { flex-direction: column; align-items: stretch; }
+    .header-right { align-items: stretch; }
+    .button-row { justify-content: stretch; flex-wrap: wrap; }
+    .button-row .btn { flex: 1 1 auto; min-width: 130px; justify-content: center; font-size: 13px; padding: 9px 10px; }
+    /* Hide low-priority buttons on small screens — save space */
+    .btn-print { display: none; }
+    .btn-settings { display: none; }
+    .filters { grid-template-columns: 1fr; }
+    h1 { font-size: 20px; }
+    .wrap { padding: 12px; }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .scroll-hint { display: block; }
+    .modal { padding: 20px; }
+    .modal h2 { font-size: 18px; }
+    /* Wider touch targets in modals on mobile */
+    .modal-actions { flex-direction: column; }
+    .modal-actions .btn { width: 100%; justify-content: center; }
+  }
+  @media (max-width: 380px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .card-value { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Active Job Order Tracker</h1>
+      <div class="subtitle">Open JOs from Bullhorn &middot; updated via Amplify report</div>
+    </div>
+    <div class="header-right">
+      <div class="sync-badge">
+        <span class="sync-dot"></span>
+        <span>Report from <span id="report-date">—</span></span>
+      </div>
+      <div class="button-row">
+        <button class="btn btn-settings" id="btn-settings" title="GitHub publish settings">&#9881;&#65039; Settings</button>
+        <button class="btn btn-secondary" id="btn-share">&#128231; Share</button>
+        <button class="btn btn-secondary" id="btn-print">&#128424; Print / PDF</button>
+        <button class="btn" id="btn-import">&#8635; Load Fresh Report</button>
+        <button class="btn btn-publish" id="btn-publish" title="Push updated data to the website">&#11014;&#65039; Publish Update</button>
+      </div>
+      <div class="publish-status" id="publish-status"></div>
+    </div>
+  </header>
+
+  <div class="web-banner" id="web-banner" style="display:none;">
+    <span style="font-size: 20px;">&#127760;</span>
+    <div><strong>Live website.</strong> Your team always sees the latest data — just share this URL. To refresh: click <em>Load Fresh Report</em>, then <em>Publish Update</em>.</div>
+  </div>
+
+  <div class="readonly-banner">
+    <span style="font-size: 18px;">&#128274;</span>
+    <div><strong>Read-only view.</strong> To change priorities or pipeline stages, update the job in Bullhorn, then re-run your Amplify report and publish here.</div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="card-label">Active JOs</div><div class="card-value" id="c-total">&mdash;</div></div>
+    <div class="card priority-a"><div class="card-label">Priority A</div><div class="card-value" id="c-a">&mdash;</div></div>
+    <div class="card priority-b"><div class="card-label">Priority B</div><div class="card-value" id="c-b">&mdash;</div></div>
+    <div class="card priority-c"><div class="card-label">Priority C</div><div class="card-value" id="c-c">&mdash;</div></div>
+    <div class="card"><div class="card-label">Internal Subs</div><div class="card-value" id="c-intsub">&mdash;</div></div>
+    <div class="card"><div class="card-label">Client Subs</div><div class="card-value" id="c-clisub">&mdash;</div></div>
+    <div class="card"><div class="card-label">Interviews</div><div class="card-value" id="c-intv">&mdash;</div></div>
+  </div>
+
+  <div class="main-grid">
+    <div>
+      <div class="filters">
+        <div class="filter-group">
+          <label>&#128269; Search (job, client, candidate, JO ID)</label>
+          <input type="text" id="f-search" placeholder="Start typing to filter..." />
+        </div>
+        <div class="filter-group">
+          <label>Priority</label>
+          <select id="f-priority"><option value="">All</option><option>A</option><option>B</option><option>C</option></select>
+        </div>
+        <div class="filter-group">
+          <label>Sales Owner</label>
+          <select id="f-sales"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label>Recruiter</label>
+          <select id="f-recruiter"><option value="">All</option></select>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div class="scroll-hint">&#8592; Swipe left/right to see all columns &#8594;</div>
+        <div class="table-wrap">
+          <table id="jo-table">
+            <thead>
+              <tr>
+                <th style="width:28px;"></th>
+                <th data-sort="priority" style="width:60px;">Pri <span class="sort-arrow">&#9650;</span></th>
+                <th data-sort="id" style="width:90px;">JO ID <span class="sort-arrow">&#9650;</span></th>
+                <th data-sort="title">Job Order <span class="sort-arrow">&#9650;</span></th>
+                <th data-sort="owner">Sales Owner <span class="sort-arrow">&#9650;</span></th>
+                <th data-sort="recruiters">Recruiter(s) <span class="sort-arrow">&#9650;</span></th>
+                <th data-sort="pipeline">Pipeline <span class="sort-arrow">&#9650;</span></th>
+                <th data-sort="candidates" style="width:80px;">Active <span class="sort-arrow">&#9650;</span></th>
+              </tr>
+            </thead>
+            <tbody id="jo-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side-panel">
+      <div class="panel">
+        <h3>&#128293; Highest-Activity Jobs</h3>
+        <ul class="panel-list" id="panel-top"></ul>
+      </div>
+      <div class="panel">
+        <h3>&#128197; Jobs in Active Interview</h3>
+        <ul class="panel-list" id="panel-interviews"></ul>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    Source: Amplify report dated <span id="footer-date">—</span> &middot; <span id="footer-url"></span>
+  </footer>
+</div>
+
+<!-- Floating Help button -->
+<button class="help-fab" id="btn-help" title="How to use this tracker">?</button>
+
+<!-- Help modal -->
+<div class="modal-bg" id="modal-help">
+  <div class="modal">
+    <h2>&#128075; Welcome to the JO Tracker</h2>
+    <p>This is a live read-only view of all open Job Orders from Bullhorn. Here's what you can do:</p>
+    <ul class="tips">
+      <li>
+        <div class="tip-icon">&#128269;</div>
+        <div class="tip-body">
+          <strong>Search and filter</strong>
+          <span>Type a job title, client, candidate name, or JO ID in the search box. Use the dropdowns to narrow by priority, sales owner, or recruiter.</span>
+        </div>
+      </li>
+      <li>
+        <div class="tip-icon">&#128065;</div>
+        <div class="tip-body">
+          <strong>Tap any row to see candidates</strong>
+          <span>The arrow on the left expands the row and shows everyone active on that job.</span>
+        </div>
+      </li>
+      <li>
+        <div class="tip-icon">&#8645;</div>
+        <div class="tip-body">
+          <strong>Sort by any column</strong>
+          <span>Click a column header (like "Priority" or "Active") to sort. Click again to reverse.</span>
+        </div>
+      </li>
+      <li>
+        <div class="tip-icon">&#8635;</div>
+        <div class="tip-body">
+          <strong>Daily updates (Olga only)</strong>
+          <span>Olga runs the Amplify report → clicks <em>Load Fresh Report</em> → clicks <em>Publish Update</em>. Everyone sees new data within ~60 seconds. No refresh needed on your end.</span>
+        </div>
+      </li>
+      <li>
+        <div class="tip-icon">&#128274;</div>
+        <div class="tip-body">
+          <strong>This is read-only</strong>
+          <span>You can't edit job orders here. Any changes (priorities, adding candidates) happen in Bullhorn. This tracker just shows what's there.</span>
+        </div>
+      </li>
+    </ul>
+    <div class="modal-actions">
+      <button class="btn" id="btn-help-close">Got it!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share modal -->
+<div class="modal-bg" id="modal-share">
+  <div class="modal">
+    <h2>&#128231; Share this tracker</h2>
+    <p>Just copy the link below and paste it into a Slack message, email, or Teams chat. Anyone who clicks it will see the latest data — no login required, works on phone and desktop.</p>
+    <div class="url-box">
+      <span id="share-url-text"></span>
+      <button class="copy-btn" id="copy-url-btn">Copy</button>
+    </div>
+    <p style="font-size:13px; color:#5a6370; margin: 0;">The link never changes. Bookmark it and refresh any time to see updates.</p>
+    <div class="modal-actions">
+      <button class="btn" id="btn-share-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import modal -->
+<div class="modal-bg" id="modal-import">
+  <div class="modal">
+    <h2>&#8635; Load a Fresh Report</h2>
+    <p>Run your Amplify report in Bullhorn, then upload the file or paste the content below. After loading, click <strong>Publish Update</strong> to push the new data to the website.</p>
+    <label>Option A &mdash; Upload the file (.txt or .csv)</label>
+    <input type="file" id="import-file" accept=".txt,.csv,.tsv" />
+    <label>Option B &mdash; Paste the report text here</label>
+    <textarea id="import-text" placeholder="Paste the Amplify output here..."></textarea>
+    <div class="modal-error" id="import-error"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-import-cancel">Cancel</button>
+      <button class="btn" id="btn-parse">Load Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- GitHub Settings modal -->
+<div class="modal-bg" id="modal-settings">
+  <div class="modal">
+    <h2>&#9881;&#65039; Publish Settings</h2>
+    <p>Enter your GitHub details below. The <strong>Publish Update</strong> button uses these to push new data to your live website automatically. You only need to set this up once.</p>
+    <p style="font-size:13px; color:#5a6370; margin-bottom:0;">📄 Need help? Open the <strong>SETUP-GUIDE.html</strong> file in your project folder — it walks through every step with screenshots.</p>
+
+    <label>GitHub Username</label>
+    <input type="text" id="gh-owner" placeholder="e.g. olgakuzmenko" autocomplete="off" autocapitalize="off" spellcheck="false" />
+
+    <label>Repository Name</label>
+    <input type="text" id="gh-repo" placeholder="jo-tracker" autocomplete="off" autocapitalize="off" spellcheck="false" />
+    <div class="settings-note">This is the name you gave your GitHub repository — probably <strong>jo-tracker</strong>.</div>
+
+    <label>Personal Access Token</label>
+    <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" />
+    <div class="settings-note">Generated once at: github.com → Settings → Developer settings → Personal access tokens → Tokens (classic). Check the <strong>public_repo</strong> scope. Your token is stored only in this browser and never shared.</div>
+
+    <div class="modal-error" id="settings-error"></div>
+    <div class="modal-success" id="settings-success"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-settings-cancel">Cancel</button>
+      <button class="btn" id="btn-settings-save">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Initial embedded data (fallback when data.json is not available) ───
+let DATA = [
+  { id:13539, owner:"Michael Wrightington", priority:"A", title:"IS Business Operations Manager (interim)", client:"Medical University of South Carolina", recruiters:[], intSub:0, cliSub:0, intv:0, candidates:[] },
+  { id:13538, owner:"Michael Wrightington", priority:"A", title:"Implementation Manager (Integrations)", client:"Commit Consulting", recruiters:["Tim Baker"], intSub:0, cliSub:0, intv:0, candidates:[] },
+  { id:13537, owner:"Michael Wrightington", priority:"A", title:"Lead Engineer / Architect", client:"Acadian Asset Management", recruiters:["Bryan Volek"], intSub:1, cliSub:1, intv:0, candidates:["Hanson Wu"] },
+  { id:13519, owner:"Michael Wrightington", priority:"A", title:"Application Support Engineer", client:"Bain Capital", recruiters:["Morgan Feddersen","Tim Baker","Randy Dominikow"], intSub:9, cliSub:2, intv:0, candidates:["Stephen Fitzpatrick","Kevin Welch","Naga Bhupal","Wilson Andrade","Michael Ricci","Boris Eibelman","Muhammed Mousa","Edward Egan","Christopher Pinard"] },
+  { id:13518, owner:"Michael Wrightington", priority:"B", title:"IT Project Manager", client:"Bain Capital", recruiters:["Randy Dominikow"], intSub:5, cliSub:4, intv:1, candidates:["Rajeswari Vasan","Mirjan Xhabrahimi","Shailesh Munankarmi","Pernilla Frisk","Todd Flint"] },
+  { id:13514, owner:"Michael Wrightington", priority:"B", title:"Full-Stack Engineer", client:"Acadian Asset Management", recruiters:["Tim Baker","Bryan Volek","Morgan Feddersen"], intSub:2, cliSub:2, intv:1, candidates:["Jeffrey Radcliffe","Bradley Eichenberg"] },
+  { id:13500, owner:"Michael Wrightington", priority:"B", title:"VP / Principal AI Engineer", client:"Acadian Asset Management", recruiters:["Randy Dominikow"], intSub:4, cliSub:2, intv:0, candidates:["Neil Powers","Michael Janega","Maria Guinsburg","Ankit Batra"] },
+  { id:13540, owner:"Mike Blecher", priority:"A", title:"Oracle/ETL Database Developer", client:"American Tower Corporation", recruiters:[], intSub:0, cliSub:0, intv:0, candidates:[] },
+  { id:13542, owner:"Sam Pendleton", priority:"B", title:"Azure Devops Engineer - EPAM/SitusAMC", client:"EPAM Systems", recruiters:[], intSub:1, cliSub:0, intv:0, candidates:["Michael Oyetunji"] },
+  { id:13521, owner:"Sam Pendleton", priority:"B", title:"Site Reliability Engineer - EPAM", client:"EPAM Systems", recruiters:["Dilan Nazhat","Olga Kuzmenko"], intSub:2, cliSub:2, intv:0, candidates:["Kamal Punn","Jahnavi Mandava"] },
+  { id:13517, owner:"Sam Pendleton", priority:"B", title:"Senior Machine Learning Engineer", client:"EPAM Systems", recruiters:["Olga Kuzmenko","Dilan Nazhat"], intSub:2, cliSub:2, intv:1, candidates:["Deekshitha Dongala","Yunxi Jia"] },
+  { id:13492, owner:"Sam Pendleton", priority:"B", title:"Lead JavaScript Engineer - EPAM", client:"EPAM Systems", recruiters:["Olga Kuzmenko","Dilan Nazhat"], intSub:1, cliSub:1, intv:1, candidates:["Michael Fleck"] },
+  { id:13439, owner:"Sam Pendleton", priority:"B", title:"EPAM - Electronic Trading Sr. Java Developer", client:"EPAM Systems", recruiters:["Olga Kuzmenko"], intSub:0, cliSub:0, intv:0, candidates:[] },
+  { id:13430, owner:"Suzanne Biscotti", priority:"A", title:"Business Analyst", client:"Plymouth Rock Assurance", recruiters:["Morgan Feddersen","Naveen Soomro"], intSub:7, cliSub:4, intv:1, candidates:["Srishma Konda","Chitra Karthik","Hardip Singh","Kenneth Misner","Brian Kingsbury","Aimee Hague","John Hopkins"] },
+  { id:13536, owner:"William Collins", priority:"B", title:"GenAI Go to Market Consultant", client:"Vista Private Equity", recruiters:["Patrick Bruen","Dilan Nazhat"], intSub:2, cliSub:0, intv:0, candidates:["Robert Coen","Charles Bell"] },
+  { id:13535, owner:"William Collins", priority:"A", title:"Solution Architect", client:"Harbourvest Partners", recruiters:["Randy Dominikow","Naveen Soomro"], intSub:0, cliSub:0, intv:0, candidates:[] },
+  { id:13534, owner:"William Collins", priority:"A", title:"App Security Engineer", client:"Harbourvest Partners", recruiters:["Bryan Volek","Dilan Nazhat","Patrick Bruen"], intSub:0, cliSub:0, intv:0, candidates:[] },
+  { id:13504, owner:"William Collins", priority:"A", title:"Product Marketing Associate", client:"Harbourvest Partners", recruiters:["Morgan Feddersen"], intSub:3, cliSub:2, intv:2, candidates:["Rachel Chieco","Rebecca Schwartz","Kristen Blake"] },
+  { id:13411, owner:"William Collins", priority:"B", title:"Sr. Workday Integrations Lead", client:"Harbourvest Partners", recruiters:["Morgan Feddersen"], intSub:1, cliSub:1, intv:1, candidates:["Venugopal Iyer"] },
+  { id:13408, owner:"William Collins", priority:"B", title:"KDB Mrinal", client:"Fidelity Investments", recruiters:["Randy Dominikow","Olga Kuzmenko"], intSub:3, cliSub:1, intv:1, candidates:["Michael Clayton","Genaro Pelipas","Aymeric Neuvy"] },
+];
+
+let reportDate = "Apr 23, 2026";
+let state = { sortKey: 'priority', sortDir: 'asc', expanded: new Set() };
+let ghSettings = null;
+let dataLoaded = false; // true once data.json fetched successfully
+
+// ─── GitHub Settings ───────────────────────────────────────────────────
+function loadSettings() {
+  try {
+    const s = localStorage.getItem('jo_gh_settings');
+    if (s) ghSettings = JSON.parse(s);
+  } catch (e) {}
+}
+
+function saveGhSettings(owner, repo, token) {
+  ghSettings = { owner: owner.trim(), repo: repo.trim(), token: token.trim() };
+  try { localStorage.setItem('jo_gh_settings', JSON.stringify(ghSettings)); } catch (e) {}
+}
+
+function getSettingsConfigured() {
+  return ghSettings && ghSettings.owner && ghSettings.repo && ghSettings.token;
+}
+
+// ─── Data loading: fetch data.json from same domain ────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('./data.json?v=' + Date.now());
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.data) && json.data.length > 0) {
+        DATA = json.data;
+        reportDate = json.reportDate || new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+        dataLoaded = true;
+      }
+    }
+  } catch (e) {
+    // Local file or network issue — use embedded DATA (that's fine)
+  }
+  document.getElementById('report-date').textContent = reportDate;
+  document.getElementById('footer-date').textContent = reportDate;
+  rebuildFilters();
+  render();
+}
+
+// ─── GitHub Publish ────────────────────────────────────────────────────
+async function publishToGitHub() {
+  if (!getSettingsConfigured()) {
+    showPublishStatus('error', '⚙️ Please configure your GitHub settings first (click the Settings button).');
+    return;
+  }
+  const { owner, repo, token } = ghSettings;
+  const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/data.json`;
+
+  setPublishButtonLoading(true);
+  showPublishStatus('loading', '⏳ Publishing to GitHub...');
+
+  try {
+    // Get current file SHA (needed to update existing file)
+    const getRes = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    let sha = null;
+    if (getRes.ok) {
+      const getJson = await getRes.json();
+      sha = getJson.sha;
+    } else if (getRes.status !== 404) {
+      const err = await getRes.json().catch(() => ({}));
+      throw new Error(`GitHub API error ${getRes.status}: ${err.message || 'check your token and repository name'}`);
+    }
+
+    // Build the data package
+    const payload = {
+      data: DATA,
+      reportDate: reportDate,
+      publishedAt: new Date().toISOString()
+    };
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+
+    const body = {
+      message: `Update JO data — ${reportDate}`,
+      content,
+      ...(sha ? { sha } : {})
+    };
+
+    // Push the update
+    const putRes = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!putRes.ok) {
+      const err = await putRes.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${putRes.status}`);
+    }
+
+    showPublishStatus('success', '✅ Published! Your team will see the updated data in about 60 seconds.');
+  } catch (err) {
+    showPublishStatus('error', '❌ ' + err.message);
+  } finally {
+    setPublishButtonLoading(false);
+  }
+}
+
+function setPublishButtonLoading(loading) {
+  const btn = document.getElementById('btn-publish');
+  btn.disabled = loading;
+  btn.textContent = loading ? '⏳ Publishing…' : '⬆️ Publish Update';
+}
+
+function showPublishStatus(type, msg) {
+  const el = document.getElementById('publish-status');
+  el.className = 'publish-status show ' + type;
+  el.textContent = msg;
+  if (type === 'success') {
+    setTimeout(() => { el.classList.remove('show'); }, 8000);
+  }
+}
+
+// ─── Rendering ─────────────────────────────────────────────────────────
+function initials(name) { return name.split(/\s+/).map(p => p[0]).join('').slice(0,2).toUpperCase(); }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+function rebuildFilters() {
+  const sales = [...new Set(DATA.map(d => d.owner))].sort();
+  const recs = [...new Set(DATA.flatMap(d => d.recruiters))].sort();
+  const selS = document.getElementById('f-sales');
+  const selR = document.getElementById('f-recruiter');
+  const curS = selS.value, curR = selR.value;
+  selS.innerHTML = '<option value="">All</option>' + sales.map(s => `<option>${escapeHtml(s)}</option>`).join('');
+  selR.innerHTML = '<option value="">All</option>' + recs.map(r => `<option>${escapeHtml(r)}</option>`).join('');
+  selS.value = curS; selR.value = curR;
+}
+
+function render() {
+  const q = document.getElementById('f-search').value.toLowerCase().trim();
+  const fp = document.getElementById('f-priority').value;
+  const fs = document.getElementById('f-sales').value;
+  const fr = document.getElementById('f-recruiter').value;
+
+  let rows = DATA.filter(d => {
+    if (q) {
+      const hay = [d.title, d.client, String(d.id), ...d.candidates].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (fp && d.priority !== fp) return false;
+    if (fs && d.owner !== fs) return false;
+    if (fr && !d.recruiters.includes(fr)) return false;
+    return true;
+  });
+
+  const keyFns = {
+    priority: d => d.priority,
+    id: d => d.id,
+    title: d => d.title.toLowerCase(),
+    owner: d => d.owner.toLowerCase(),
+    recruiters: d => d.recruiters.join(',').toLowerCase(),
+    pipeline: d => d.intSub + d.cliSub + d.intv,
+    candidates: d => d.candidates.length,
+  };
+  const fn = keyFns[state.sortKey] || keyFns.priority;
+  rows.sort((a,b) => {
+    const va = fn(a), vb = fn(b);
+    if (va < vb) return state.sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return state.sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('jo-body');
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:40px; text-align:center; color:#5a6370;">No job orders match your filters. Try clearing the dropdowns or searching something shorter.</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(d => {
+      const isExp = state.expanded.has(d.id);
+      const recAvatars = d.recruiters.length
+        ? d.recruiters.map(r => `<span class="avatar" title="${escapeHtml(r)}">${initials(r)}</span>`).join('')
+        : '<span style="color:#8a929e; font-size:12px; font-style:italic;">Unassigned</span>';
+      const recNames = d.recruiters.length
+        ? `<div style="font-size:12px; color:#5a6370; margin-top:4px;">${d.recruiters.map(escapeHtml).join(', ')}</div>`
+        : '';
+      const mainRow = `
+        <tr class="data-row ${isExp ? 'expanded' : ''}" data-id="${d.id}">
+          <td><span class="caret">&#9654;</span></td>
+          <td><span class="priority-pill priority-${d.priority}">${d.priority}</span></td>
+          <td><span class="job-id">#${d.id}</span></td>
+          <td>
+            <div class="job-title">${escapeHtml(d.title)}</div>
+            <div class="client">${escapeHtml(d.client)}</div>
+          </td>
+          <td><span class="avatar sales" title="${escapeHtml(d.owner)}">${initials(d.owner)}</span> ${escapeHtml(d.owner)}</td>
+          <td><div>${recAvatars}</div>${recNames}</td>
+          <td>
+            <div class="pipeline">
+              <span class="pipe-stat intsub" data-tip="Internal submissions — our recruiters have submitted these candidates"><span class="num">${d.intSub}</span><span class="lbl">Int Sub</span></span>
+              <span class="pipe-stat clisub" data-tip="Client submissions — forwarded to the client for review"><span class="num">${d.cliSub}</span><span class="lbl">Cli Sub</span></span>
+              <span class="pipe-stat intv" data-tip="Active interviews — currently in an interview stage"><span class="num">${d.intv}</span><span class="lbl">Intv</span></span>
+            </div>
+          </td>
+          <td style="font-weight:700; font-size:16px;">${d.candidates.length}</td>
+        </tr>`;
+      const expRow = isExp ? `
+        <tr class="candidate-row">
+          <td></td>
+          <td colspan="7">
+            <div class="label">&#128100; Active Candidates (${d.candidates.length})</div>
+            ${d.candidates.length
+              ? `<div class="candidate-chips">${d.candidates.map(c => `<span class="chip">${escapeHtml(c)}</span>`).join('')}</div>`
+              : `<div class="candidate-chips"><span class="chip empty">No active candidates on this job</span></div>`}
+          </td>
+        </tr>` : '';
+      return mainRow + expRow;
+    }).join('');
+  }
+
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === state.sortKey) th.classList.add(state.sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
+  document.getElementById('c-total').textContent = rows.length;
+  document.getElementById('c-a').textContent = rows.filter(r => r.priority === 'A').length;
+  document.getElementById('c-b').textContent = rows.filter(r => r.priority === 'B').length;
+  document.getElementById('c-c').textContent = rows.filter(r => r.priority === 'C').length;
+  document.getElementById('c-intsub').textContent = rows.reduce((s,r) => s + r.intSub, 0);
+  document.getElementById('c-clisub').textContent = rows.reduce((s,r) => s + r.cliSub, 0);
+  document.getElementById('c-intv').textContent = rows.reduce((s,r) => s + r.intv, 0);
+
+  const topJobs = [...DATA].filter(d => d.candidates.length > 0).sort((a,b) => b.candidates.length - a.candidates.length).slice(0, 6);
+  document.getElementById('panel-top').innerHTML = topJobs.length
+    ? topJobs.map(d => `
+      <li>
+        <div class="job-mini">
+          <div class="jid">#${d.id}</div>
+          <div class="jt">${escapeHtml(d.title)}</div>
+          <div class="jc">${escapeHtml(d.client)}</div>
+        </div>
+        <span class="metric">${d.candidates.length}</span>
+      </li>`).join('')
+    : '<li style="color:#8a929e;">No active candidates.</li>';
+
+  const intvJobs = [...DATA].filter(d => d.intv > 0).sort((a,b) => b.intv - a.intv);
+  document.getElementById('panel-interviews').innerHTML = intvJobs.length
+    ? intvJobs.map(d => `
+      <li>
+        <div class="job-mini">
+          <div class="jid">#${d.id}</div>
+          <div class="jt">${escapeHtml(d.title)}</div>
+          <div class="jc">${escapeHtml(d.client)}</div>
+        </div>
+        <span class="metric gold">${d.intv}</span>
+      </li>`).join('')
+    : '<li style="color:#8a929e;">No active interviews.</li>';
+}
+
+// ─── Event wiring ──────────────────────────────────────────────────────
+document.getElementById('f-search').addEventListener('input', render);
+document.getElementById('f-priority').addEventListener('change', render);
+document.getElementById('f-sales').addEventListener('change', render);
+document.getElementById('f-recruiter').addEventListener('change', render);
+
+document.querySelectorAll('th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    else { state.sortKey = key; state.sortDir = 'asc'; }
+    render();
+  });
+});
+
+document.getElementById('jo-body').addEventListener('click', e => {
+  const row = e.target.closest('tr.data-row');
+  if (!row) return;
+  const id = Number(row.dataset.id);
+  if (state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
+  render();
+});
+
+// ─── Modal helpers ─────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); }));
+
+// Help
+document.getElementById('btn-help').addEventListener('click', () => openModal('modal-help'));
+document.getElementById('btn-help-close').addEventListener('click', () => {
+  closeModal('modal-help');
+  try { sessionStorage.setItem('jo_seen_welcome', '1'); } catch (e) {}
+});
+
+// Share — populate URL dynamically
+document.getElementById('btn-share').addEventListener('click', () => {
+  const url = window.location.href.split('?')[0].replace(/\/$/, '') + '/';
+  document.getElementById('share-url-text').textContent = url;
+  openModal('modal-share');
+});
+document.getElementById('btn-share-close').addEventListener('click', () => closeModal('modal-share'));
+document.getElementById('copy-url-btn').addEventListener('click', () => {
+  const url = document.getElementById('share-url-text').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copy-url-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  }).catch(() => {
+    // Fallback for older mobile browsers
+    const el = document.createElement('textarea');
+    el.value = url; document.body.appendChild(el);
+    el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+  });
+});
+
+// Print
+document.getElementById('btn-print').addEventListener('click', () => window.print());
+
+// Publish
+document.getElementById('btn-publish').addEventListener('click', publishToGitHub);
+
+// Settings modal
+document.getElementById('btn-settings').addEventListener('click', () => {
+  // Pre-fill if already configured
+  if (ghSettings) {
+    document.getElementById('gh-owner').value = ghSettings.owner || '';
+    document.getElementById('gh-repo').value = ghSettings.repo || '';
+    document.getElementById('gh-token').value = ghSettings.token || '';
+  }
+  document.getElementById('settings-error').classList.remove('show');
+  document.getElementById('settings-success').classList.remove('show');
+  openModal('modal-settings');
+});
+document.getElementById('btn-settings-cancel').addEventListener('click', () => closeModal('modal-settings'));
+document.getElementById('btn-settings-save').addEventListener('click', () => {
+  const owner = document.getElementById('gh-owner').value.trim();
+  const repo = document.getElementById('gh-repo').value.trim();
+  const token = document.getElementById('gh-token').value.trim();
+  const errEl = document.getElementById('settings-error');
+  const okEl = document.getElementById('settings-success');
+  errEl.classList.remove('show'); okEl.classList.remove('show');
+  if (!owner || !repo || !token) {
+    errEl.textContent = 'Please fill in all three fields.';
+    errEl.classList.add('show'); return;
+  }
+  if (!token.startsWith('gh')) {
+    errEl.textContent = 'That doesn\'t look like a GitHub token (should start with "ghp_" or "github_pat_").';
+    errEl.classList.add('show'); return;
+  }
+  saveGhSettings(owner, repo, token);
+  okEl.textContent = '✅ Settings saved! You can now use the Publish Update button.';
+  okEl.classList.add('show');
+  setTimeout(() => closeModal('modal-settings'), 2000);
+});
+
+// Import
+document.getElementById('btn-import').addEventListener('click', () => {
+  openModal('modal-import');
+  document.getElementById('import-error').classList.remove('show');
+  document.getElementById('import-text').value = '';
+  document.getElementById('import-file').value = '';
+});
+document.getElementById('btn-import-cancel').addEventListener('click', () => closeModal('modal-import'));
+document.getElementById('import-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const text = await f.text();
+  document.getElementById('import-text').value = text;
+});
+document.getElementById('btn-parse').addEventListener('click', () => {
+  const raw = document.getElementById('import-text').value;
+  const errBox = document.getElementById('import-error');
+  errBox.classList.remove('show');
+  try {
+    const parsed = parseAmplify(raw);
+    if (parsed.length === 0) throw new Error('No job orders detected in the input.');
+    DATA = parsed;
+    state.expanded = new Set();
+    const d = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    reportDate = d;
+    document.getElementById('report-date').textContent = d;
+    document.getElementById('footer-date').textContent = d;
+    rebuildFilters(); render();
+    closeModal('modal-import');
+    showPublishStatus('loading', '📋 Report loaded! Click ⬆️ Publish Update to push it to the website.');
+    // Status clears itself after publish or after 15s
+    setTimeout(() => {
+      const el = document.getElementById('publish-status');
+      if (el.classList.contains('loading')) el.classList.remove('show');
+    }, 15000);
+  } catch (err) {
+    errBox.textContent = 'Could not read that report: ' + err.message + ' — try pasting it again or use the file upload option.';
+    errBox.classList.add('show');
+  }
+});
+
+// ─── Welcome modal (first visit) ───────────────────────────────────────
+try {
+  if (!sessionStorage.getItem('jo_seen_welcome')) {
+    setTimeout(() => openModal('modal-help'), 400);
+  }
+} catch (e) {}
+
+// ─── Footer URL + web-banner visibility ────────────────────────────────
+try {
+  const urlEl = document.getElementById('footer-url');
+  const isLive = window.location.protocol !== 'file:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  if (isLive) {
+    urlEl.textContent = window.location.hostname;
+    // Show the "Live website" banner only on the real hosted site
+    document.getElementById('web-banner').style.display = 'flex';
+  } else {
+    urlEl.textContent = 'local preview';
+    // On local preview, nudge Olga toward the Setup Guide
+    const banner = document.getElementById('web-banner');
+    banner.style.display = 'flex';
+    banner.style.background = '#fff8e1';
+    banner.style.borderColor = '#ffe49b';
+    banner.style.color = '#6b4e00';
+    banner.innerHTML = '<span style="font-size:20px;">&#128194;</span><div><strong>Local preview.</strong> This is your editable copy. To publish to the web, follow the <strong>SETUP-GUIDE.html</strong> in this folder, then use the ⚙️ Settings button and ⬆️ Publish Update.</div>';
+  }
+} catch(e) {}
+
+// ─── Amplify parser ────────────────────────────────────────────────────
+function parseAmplify(text) {
+  if (!text || !text.trim()) throw new Error('the input is empty');
+  const firstLine = text.split(/\r?\n/).find(l => l.trim()) || '';
+  if (firstLine.includes(',') || firstLine.includes('\t')) return parseCSV(text);
+  return parseEmailStyle(text);
+}
+function parseCSV(text) {
+  const sep = text.includes('\t') && !text.split(/\r?\n/)[0].includes(',') ? '\t' : ',';
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const header = splitCsvLine(lines[0], sep).map(h => h.trim().toLowerCase());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = splitCsvLine(lines[i], sep);
+    if (cells.length < 4) continue;
+    const rec = {}; header.forEach((h, idx) => rec[h] = (cells[idx] || '').trim());
+    const row = {
+      id: parseInt(rec['job id']) || 0,
+      owner: rec['job owner'] || rec['owner'] || '',
+      priority: (rec['priority'] || '').toUpperCase().slice(0,1),
+      title: rec['job'] || rec['job title'] || '',
+      client: rec['client'] || '',
+      recruiters: splitList(rec['recruiters assigned'] || rec['recruiters'] || ''),
+      intSub: parseInt(rec['active internal subs']) || 0,
+      cliSub: parseInt(rec['active client subs']) || 0,
+      intv: parseInt(rec['active interviews']) || 0,
+      candidates: splitList(rec['active candidate names'] || rec['active candidates'] || ''),
+    };
+    if (row.id) rows.push(row);
+  }
+  if (rows.length === 0) throw new Error('CSV columns did not match. Expected: Job Owner, Priority, Job ID, Job, Client, Recruiters Assigned, Active Internal Subs, Active Client Subs, Active Interviews, Active Candidate Names');
+  return rows;
+}
+function splitCsvLine(line, sep) {
+  const out = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (c === sep && !inQ) { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur); return out;
+}
+function splitList(s) {
+  if (!s || s === '—' || s === '-') return [];
+  return s.split(/[,;]+/).map(x => x.trim()).filter(Boolean);
+}
+function parseEmailStyle(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim());
+  let startIdx = -1;
+  for (let i = 0; i < lines.length; i++) if (lines[i] === 'Active Candidate Names') { startIdx = i + 1; break; }
+  if (startIdx === -1) throw new Error('could not find the column header "Active Candidate Names" — paste the full report including column labels');
+  let endIdx = lines.length;
+  for (let i = startIdx; i < lines.length; i++) {
+    if (/highest[- ]?activity/i.test(lines[i]) || /jobs with active interview/i.test(lines[i]) || /^--$/.test(lines[i])) { endIdx = i; break; }
+  }
+  const dataLines = [];
+  for (let i = startIdx; i < endIdx; i++) if (lines[i]) dataLines.push(lines[i]);
+  if (dataLines.length % 10 !== 0) throw new Error(`found ${dataLines.length} values after the header, which is not a multiple of 10 columns — one of the values may be missing`);
+  const rows = [];
+  for (let i = 0; i < dataLines.length; i += 10) {
+    const [owner, priority, idStr, title, client, recsStr, intSub, cliSub, intv, candsStr] = dataLines.slice(i, i + 10);
+    rows.push({
+      id: parseInt(idStr) || 0,
+      owner: owner || '',
+      priority: (priority || '').toUpperCase().slice(0,1),
+      title: title || '', client: client || '',
+      recruiters: splitList(recsStr),
+      intSub: parseInt(intSub) || 0, cliSub: parseInt(cliSub) || 0, intv: parseInt(intv) || 0,
+      candidates: splitList(candsStr),
+    });
+  }
+  return rows;
+}
+
+// ─── Boot ──────────────────────────────────────────────────────────────
+loadSettings();
+loadData();
+</script>
+</body>
+</html>
